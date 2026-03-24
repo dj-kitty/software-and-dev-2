@@ -64,6 +64,8 @@ System.out.println("The average age between the five users is " + average + ".")
 }
 public static void main(String[] args) throws FileNotFoundException, IOException {
       
+Boolean debug = true;
+
 String filePath = "simpleDatabase.txt";//filepath
 
 try{
@@ -119,24 +121,40 @@ if(trimmed.matches("[0-9]+")){
     int ageNum = Integer.parseInt(trimmed);//checks if it is a number
     numAge.add(ageNum);
     done = true;
+
+    if(debug == true){
+        System.out.println("age = " + numAge);
+    }
 }
 else{
     System.out.println("Sorry, please input a number.");
 }
-
+System.out.println(done);
 } while(!done); //makes this loop repeat until number is found
 
 System.out.println("What is your name?");//asks for name
 String name = input.readLine();
+if(debug == true){
+        System.out.println("name = " + name);
+    }
 
 System.out.println("What state do you live in?");//asks for state
 String state = input.readLine();
+if(debug == true){
+        System.out.println("state = " + state);
+    }
 
 System.out.println("What is your favorite animal?");//asks for fav animal
 String animal = input.readLine();
+if(debug == true){
+        System.out.println("animal = " + animal);
+    }
 
 System.out.println("What is your favorite color?");//asks for fav color
 String color = input.readLine();
+if(debug == true){
+        System.out.println("color = " + color);
+    }
 
 write.write(age.trim() + delimiter + name + delimiter + state + delimiter + animal + delimiter + color);//adds everything to file
 write.newLine();//makes new line
