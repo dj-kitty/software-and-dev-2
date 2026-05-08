@@ -1,0 +1,659 @@
+/*This program is a database program with multiple instances of user input, not just for each entry
+Created by David Johnson for Software and Program Development II
+
+First, the user is asked if they want to make a new database or use an existing one
+If they make a new database, they are asked if they want a password made and then the password is made if true, and make categories
+Then the use has to put in the password if there is one and the categories are printed out 
+Then a menu is printed out that has all the options. The user chooses one to do: add, edit, delete, search,
+change password, or print categories. That method runs and returns back to the menu. When the user is done they have an exit option
+*/
+
+
+import java.io.*;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
+
+public class database {
+    
+public static boolean usePassword(RandomAccessFile a, int maxLength) throws IOException, InterruptedException {
+
+    Scanner input = new Scanner(System.in);
+
+    a.seek(0);
+
+    String raw = "";//empty since this is where the first line of the file will go
+    for (int i = 0; i < maxLength; i++) {
+        raw += a.readChar();
+    }
+
+    a.readChar();
+
+    String clean = separate(raw).trim();//trimming and separating String raw
+
+    String[] parts = clean.split(", ");//splitting clean
+
+    if (parts.length < 3) {
+        System.out.println("Password record is corrupted. Please create a new password.");
+        //there are three parts to the password line, 'password' to define the line,
+        //whether there is a password, and the password. if there are less than three parts
+        //in the array than the password in corrupted
+        return false;
+    }
+
+    String used = parts[1];       
+    String password = parts[2]; 
+    password = password.replace(",", "");  
+
+    if (used.equalsIgnoreCase("false")) {
+        return true;//if there is no password returns that no password is needed
+    }
+
+    System.out.println("This database is password protected.");
+
+
+int numIncAtt = 0;
+Boolean complete = true;
+
+do{//for if their is a password
+    complete = true;
+
+    System.out.print("Enter password: ");
+    String attempt = input.nextLine();
+
+    if (attempt.equals(password)) {//obviously the password must match exactly, thus no trimming, separating, or case changing
+        System.out.println("Access granted.");
+        return true;
+    } else {
+        System.out.println("Incorrect password.");
+        complete = false;
+        numIncAtt ++;
+    }
+    if(numIncAtt == 10){//lockout mechanism
+    System.out.println("Sorry, too many incorrect attempts to open. Please try again in 5 minutes.");
+    TimeUnit.MINUTES.sleep(5);//only way to reset this is to completely stop the program and restart it
+    numIncAtt = 0;//resets number of incorrect attempts so can be done again if necessary
+    }
+
+}while(!complete);
+
+return true;
+
+}
+
+public static void changePassword(RandomAccessFile a, int maxLength) throws IOException {
+
+    Scanner input = new Scanner(System.in);
+
+    a.seek(0);
+
+    String raw = "";
+    for (int i = 0; i < maxLength; i++) {
+        raw += a.readChar();
+    }
+
+    a.readChar();
+
+    String clean = separate(raw).trim();
+
+    String[] parts = clean.split(", ");
+
+    if (parts.length < 3) {//explained earlier
+        System.out.println("Password record is corrupted.");
+        return;
+    }
+
+    String used = parts[1];       
+    String oldPassword = parts[2];
+
+    if (used.equalsIgnoreCase("false")) {//if there is no password
+        System.out.println("Password protection is currently OFF.");
+        System.out.println("Do you want to enable it? Please input yes or no.");
+        String ans = input.nextLine();
+
+        if (!ans.equalsIgnoreCase("yes")) {//if answer is anything but yes password status is unchanged
+            System.out.println("Password unchanged.");
+            return;
+        }
+
+        System.out.println("Enter new password:");
+        String newPass = input.nextLine();
+
+        ArrayList<String> record = new ArrayList<>();
+        record.add("Password@@true@@");
+        record.add(newPass + "@@");
+
+        a.seek(0);
+        Write(a, record, maxLength);
+
+        System.out.println("Password enabled and saved.");
+        return;
+    }
+
+    System.out.println("Enter current password:");// must know current password in order to change password
+    String attempt = input.nextLine();
+
+    if (!attempt.equals(oldPassword)) {
+        System.out.println("Incorrect password. Cannot change password.");
+        return;
+    }
+
+    System.out.println("Enter new password:");//new password verification
+    String newPassword = input.nextLine();
+
+    ArrayList<String> updated = new ArrayList<>();
+    updated.add("Password@@true@@");
+    updated.add(newPassword + "@@");
+
+    a.seek(0);
+    Write(a, updated, maxLength);
+
+    System.out.println("Password changed successfully.");
+
+}
+
+public static void Write(RandomAccessFile a, ArrayList<String> text, int maxLength) throws IOException {
+
+    StringBuilder build = new StringBuilder();
+    for (String s : text) {
+        build.append(s);
+    }
+
+    if (build.length() > maxLength) {//if text is too long it shortens it
+        build.setLength(maxLength);
+    }
+
+    while (build.length() < maxLength) {//if text is to short it adds spaces
+        build.append(' ');
+    }
+
+    a.seek(a.length());
+
+    a.writeChars(build.toString());
+
+    a.writeChar('\n');
+}
+
+public static void categories(RandomAccessFile a, int maxLength) throws IOException{
+
+Scanner input = new Scanner(System.in);
+
+System.out.println("How many different categories do you want each entry to be? Please input a number.");
+int numOfCat = input.nextInt();
+input.nextLine();
+
+ArrayList<String> categories = new ArrayList<>();
+
+for(int i = 1; i <= numOfCat; i++){
+    
+System.out.println("What do you want Category " + i + " to be?");
+String category = input.nextLine();
+
+String regex = "\\s";
+String[] split = category.split(regex);//split at spaces
+
+String rebuilt = String.join("@", split); //replaces spaces with @
+
+categories.add(rebuilt + "@@");//adds delimiter
+
+
+}
+
+    categories.add(0, "Categories@@");
+System.out.println(categories);
+
+String cat = categories.toString();
+String[] separated = cat.split(", ");
+
+String New = String.join("", separated);
+categories.clear();
+categories.add(New);
+
+    Write(a, categories, maxLength);
+
+}
+
+public static List<String> findLine(RandomAccessFile a, ArrayList<String> b, int maxLength) throws IOException {
+
+    String search = b.get(0);//index 0 is the keyword
+    b.clear();
+
+    long recordSize = (maxLength * 2) + 2; 
+    long totalRecords = a.length() / recordSize;
+
+    long lineNumber = 0;
+
+    for (long i = 2; i < totalRecords; i++) {
+
+        long offset = i * recordSize;
+        a.seek(offset);
+
+        String raw = "";//empty since it will be filled later
+        for (int c = 0; c < maxLength; c++) {
+            raw += a.readChar();
+        }
+
+        a.readChar();
+
+        String clean = separate(raw).trim();
+
+        if (clean.toLowerCase().contains(search.toLowerCase())) {//turns keyword and potential result to lowercase
+                                                                 //for easier comparison
+            lineNumber = i + 1;
+            b.add(clean);
+            b.add(String.valueOf(lineNumber));
+            return b;
+        }
+    }
+
+    b.add("NOT FOUND");
+    b.add("0");
+    return b;
+}
+
+public static List<String> getCat(RandomAccessFile a, ArrayList<String> out, int maxLength) throws IOException {
+
+    out.clear();//makes sure arraylist is empty since this is what the categories will be stored in
+
+    long recordSize = (maxLength * 2) + 2;
+
+    long offset = recordSize;  
+    a.seek(offset);//puts the cursor at the start of where the second line begins
+
+    String raw = "";
+    for (int i = 0; i < maxLength; i++) {
+        raw += a.readChar();
+    }
+
+    a.readChar(); 
+
+    String clean = separate(raw).trim();
+
+    String[] parts = clean.split(", ");
+
+    for (int i = 1; i < parts.length; i++) {
+        out.add(parts[i]);
+    }
+
+    return out;
+}
+
+public static String separate(String string){
+
+    string = string.replace("[", "").replace("]", "");
+//since the replacement spot is empty, this is just deleting the brackts
+
+    string = string.replace("@@", ", ");//replaces separator with comma
+
+    string = string.replace("@", " "); //replaces space separator with space
+
+    string = string.trim().replaceAll(" +", " ");//replaces double spaces with single space
+
+    return string;
+}
+
+public static void add(RandomAccessFile a, ArrayList<String> categories, int maxlength) throws IOException{
+
+Scanner input =  new Scanner(System.in);
+
+ArrayList<String> data = new ArrayList<>();
+
+for(int i = 0; i < categories.size(); i++){
+    int currentCat = i + 1;
+    System.out.println("What do you want Category " + currentCat + ": " + categories.get(i) + " to be?");
+    String answer = input.nextLine();
+    data.add(answer + "@");
+}
+
+Write(a, data, maxlength);
+
+}
+
+public static void edit(RandomAccessFile a, ArrayList<String> categories, int maxLength) throws IOException {
+
+    Scanner input = new Scanner(System.in);
+
+    System.out.println("What entry do you want to edit? Enter a word from that entry:");
+    String keyword = input.nextLine();
+
+    ArrayList<String> searchList = new ArrayList<>();
+    searchList.add(keyword);
+
+    List<String> result = findLine(a, searchList, maxLength);
+
+    String foundLine = result.get(0);
+    long lineNumber = Long.parseLong(result.get(1));
+
+    if (lineNumber == 0) {//since the findline method returns the line number or zero if no entry found, a line number of zero
+                          //means no entry
+        System.out.println("No matching entry found.");
+        return;
+    }
+
+    System.out.println("Entry found:");
+    System.out.println(foundLine);
+
+    System.out.println("Which category do you want to change?");
+    for (int i = 0; i < categories.size(); i++) {
+        System.out.println(i + ": " + categories.get(i));
+    }
+
+    int index = input.nextInt();
+    input.nextLine(); 
+
+    System.out.println("Enter the new value:");
+    String newValue = input.nextLine();
+
+    String[] fields = foundLine.split(", ");
+
+    fields[index] = newValue;//changes the data at the specified index to the new data
+
+    ArrayList<String> rebuilt = new ArrayList<>();
+
+    
+    for (String f : fields) {
+        rebuilt.add(f + "@@");
+    }
+
+    long recordSize = (maxLength * 2) + 2;
+    long offset = (lineNumber - 1) * recordSize;
+
+    a.seek(offset);
+    Write(a, rebuilt, maxLength);
+
+    System.out.println("Entry edited successfully.");
+
+}
+
+public static void search(RandomAccessFile a, int maxLength) throws IOException {
+
+    Scanner input = new Scanner(System.in);
+
+    System.out.println("What are you looking for?");
+    String keyword = input.nextLine().toLowerCase();
+
+    long recordSize = (maxLength * 2) + 2;//length of each line
+    long totalRecords = a.length() / recordSize;//= size of file / length of each line
+
+    System.out.println("Here are the results:");
+
+    for (long i = 2; i < totalRecords; i++) {
+
+        long offset = i * recordSize;
+        a.seek(offset);
+
+        String raw = "";
+        for (int c = 0; c < maxLength; c++) {
+            raw += a.readChar();
+        }
+
+        a.readChar(); // skip newline
+
+        String clean = separate(raw).trim();
+
+        if (clean.toLowerCase().contains(keyword)) {
+            System.out.println(clean);
+        }
+    }
+
+}
+
+public static void delete(RandomAccessFile a, int maxLength) throws IOException {
+
+    Scanner input = new Scanner(System.in);
+
+    System.out.println("Enter a keyword from the entry you want to delete:");
+    String keyword = input.nextLine();
+
+    ArrayList<String> searchList = new ArrayList<>();
+    searchList.add(keyword);
+
+    List<String> result = findLine(a, searchList, maxLength);
+
+    String foundLine = result.get(0);
+    long lineNumber = Long.parseLong(result.get(1));
+
+    if (lineNumber == 0) {
+        System.out.println("No matching entry found.");
+        return;
+    }
+
+    System.out.println("Found entry:");
+    System.out.println(foundLine);
+
+    System.out.println("Are you sure you want to delete this entry? (yes/no)");
+    String confirm = input.nextLine();
+
+    if (!confirm.equalsIgnoreCase("yes")) {//anything other than yes will cancel the deletion process
+        System.out.println("Deletion cancelled.");
+        return;
+    }
+
+    ArrayList<String> deleted = new ArrayList<>();
+    deleted.add("DELETED@@");
+
+    long recordSize = (maxLength * 2) + 2;
+    long offset = (lineNumber - 1) * recordSize;
+
+    a.seek(offset);
+    Write(a, deleted, maxLength);
+
+    System.out.println("Entry deleted successfully.");
+
+}
+
+
+
+public static void main(String[] args) throws FileNotFoundException, IOException, InterruptedException {
+    
+int maxLength = 100;    
+
+Scanner input = new Scanner(System.in);
+Boolean newDatabase = null;
+Boolean complete = true;
+
+String filepath = null;
+RandomAccessFile file = null;
+
+do{//the start of the program
+    complete = true;
+    
+    System.out.println("Would you like to create a new database or continue with an existing one?");
+System.out.println("Please input 'new' or 'continue'.");
+String answer = input.nextLine();
+
+if(answer.matches("new")){
+newDatabase = true;
+}
+else if(answer.matches("continue")){
+    newDatabase = false;
+}
+else{
+    newDatabase = null;
+    System.out.println("Invalid input. Please try again.");
+    complete = false;
+}
+}while (!complete);
+
+String name = null;
+String location = null;
+
+if(newDatabase == true){//creates new database
+do{
+    complete = true;
+
+    System.out.println("What do you want the database to be called?");
+    name = input.nextLine();
+
+if(newDatabase == true){
+    System.out.println("Where do you want the database to be stored at?");
+    System.out.println("Please input a filepath.");
+    location = input.nextLine();
+}
+filepath = location + "\\" + name + ".txt";//creates the file path from the location and the name, adds .txt because that is
+                                           //what text files are
+
+try {
+    
+    file = new RandomAccessFile(filepath, "rw");//attempts to create file, usually works unless the location
+                                                     //given earlier is wrong
+
+} catch (Exception e) {
+System.out.println("Sorry, womething went wrong: " + e.getMessage());
+complete = false;
+}
+
+System.out.println("Do you want to password protect this file?");//set up password
+String pp = input.nextLine();
+Boolean done = true;
+String password = null;
+Boolean passwordUsed = null;
+do{
+
+if(pp.matches("yes")){
+    System.out.println("What do you want the password to be?");
+    password = input.nextLine();
+    passwordUsed = true;
+}
+else if(pp.matches("no")){
+    password = null;
+    passwordUsed = false;
+}
+else{
+    System.out.println("Invalid input. Please try again.");
+    done = false;
+}
+
+}while(!done);
+
+String passLine = "Password@@" + passwordUsed + "@@" + password + "@@";
+file.seek(0);
+ArrayList<String> pass = new ArrayList<>();
+pass.add(passLine);
+
+Write(file, pass, maxLength);
+
+categories(file, maxLength);//calls method to make the categories
+
+}while (!complete);
+}
+
+if(newDatabase == false){//pulls existing database
+    do{
+complete = true;
+
+System.out.println("What is the filepath of the existing database?");
+filepath = input.nextLine();
+
+file = new RandomAccessFile(filepath, "rw");//makes random access file from database
+
+
+    }while(!complete);
+
+TimeUnit.SECONDS.sleep(3);
+System.out.println("Fetching file...");
+TimeUnit.SECONDS.sleep(3);
+
+do{
+    complete = true;
+
+    System.out.println("\nNow that we have that set up, do you want to use the categories set up already or make new ones?");
+    System.out.println("Please input 'yes' for keeping categories or 'no' for new categories");    
+    String answer = input.nextLine();
+
+    if(answer.matches("yes")){
+        System.out.println("\nOk. Current categories will be used.");
+    }
+    else if(answer.matches("no")){
+        System.out.println("Okay. New categories will be made.");
+        categories(file, maxLength);
+    }
+    else{
+        System.out.println("Invalid input. Please try again.");
+        complete = false;
+    }
+
+
+}while (!complete);
+
+}
+
+boolean ok = usePassword(file, maxLength);
+if (!ok) {
+    System.out.println("Exiting program.");
+    return;
+}
+
+ArrayList<String> categories = new ArrayList<>();
+getCat(file, categories, maxLength);
+
+System.out.println("\nYour current categories are: " + categories);
+
+TimeUnit.SECONDS.sleep(5);
+
+
+boolean running = true;
+
+while (running) {
+
+    System.out.println("\n===== DATABASE MENU =====");//all the options
+    TimeUnit.SECONDS.sleep(1);
+    System.out.println("1. Add Entry");
+    TimeUnit.SECONDS.sleep(1);
+    System.out.println("2. Edit Entry");
+    TimeUnit.SECONDS.sleep(1);
+    System.out.println("3. Delete Entry");
+    TimeUnit.SECONDS.sleep(1);
+    System.out.println("4. Search");
+    TimeUnit.SECONDS.sleep(1);
+    System.out.println("5. Change Password");
+    TimeUnit.SECONDS.sleep(1);
+    System.out.println("6. Show Categories");
+    TimeUnit.SECONDS.sleep(1);
+    System.out.println("7. Exit");
+    TimeUnit.SECONDS.sleep(1);
+    System.out.print("Please enter the number corresponding to the option you choose: ");
+
+    String choice = input.nextLine();
+
+    switch (choice) {//this is easier and less complicated than using a whole if else loop
+
+        case "1":
+            add(file, categories, maxLength);
+            break;//the break returns back to this menu after completing the method
+
+        case "2":
+            edit(file, categories, maxLength);
+            break;
+
+        case "3":
+            delete(file, maxLength);
+            break;
+
+        case "4":
+            search(file, maxLength);
+            break;
+
+        case "5":
+            changePassword(file, maxLength);
+            break;
+
+        case "6":
+            System.out.println("Current categories: " + categories);
+            break;
+
+        case "7":
+            running = false;
+            System.out.println("Exiting program.");
+            break;
+
+        default:
+            System.out.println("Invalid choice. Try again.");
+            break;
+    }
+}
+
+input.close();
+
+}
+}
+
